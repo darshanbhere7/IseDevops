@@ -2,22 +2,21 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = 'dockerhub-creds'   // Jenkins credential ID
-        IMAGE_NAME = 'darshanbhere7/abstergo-web'    // Your Docker Hub username/repo name
+        DOCKER_IMAGE = 'darshanbhere7/abstergo-web:latest'
+        DOCKER_CREDENTIALS_ID = 'dockerhub-creds'
     }
 
     stages {
-        stage('Clone Repo') {
+        stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/darshanbhere7/IseDevops.git'
+                git credentialsId: 'github-creds', url: 'https://github.com/darshanbhere7/IseDevops.git', branch: 'main'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Build Docker image
-                    dockerImage = docker.build("${IMAGE_NAME}:latest")
+                    sh 'docker build -t $DOCKER_IMAGE .'
                 }
             }
         }
@@ -25,10 +24,19 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    // Push to Docker Hub
-                    docker.withRegistry('', "${DOCKERHUB_CREDENTIALS}") {
-                        dockerImage.push("latest")
+                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CREDENTIALS_ID}") {
+                        sh 'docker push $DOCKER_IMAGE'
                     }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                script {
+                    sh 'docker stop static-site || true'
+                    sh 'docker rm static-site || true'
+                    sh 'docker run -d --name static-site -p 8081:80 $DOCKER_IMAGE'
                 }
             }
         }
